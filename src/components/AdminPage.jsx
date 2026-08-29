@@ -387,21 +387,23 @@ export default function AdminPage({ token, onLogout }) {
                   onChange={(e) => updateDay(i, 'enabled', e.target.checked)}
                 />
                 <span className="day-name">{DAY_NAMES[i]}</span>
-                <input
-                  className="input input-time"
-                  type="time"
-                  value={d.open}
-                  disabled={!d.enabled}
-                  onChange={(e) => updateDay(i, 'open', e.target.value)}
-                />
-                <span className="muted">a</span>
-                <input
-                  className="input input-time"
-                  type="time"
-                  value={d.close}
-                  disabled={!d.enabled}
-                  onChange={(e) => updateDay(i, 'close', e.target.value)}
-                />
+                <span className="time-pair">
+                  <input
+                    className="input input-time"
+                    type="time"
+                    value={d.open}
+                    disabled={!d.enabled}
+                    onChange={(e) => updateDay(i, 'open', e.target.value)}
+                  />
+                  <span className="muted">a</span>
+                  <input
+                    className="input input-time"
+                    type="time"
+                    value={d.close}
+                    disabled={!d.enabled}
+                    onChange={(e) => updateDay(i, 'close', e.target.value)}
+                  />
+                </span>
               </div>
             ))}
           </div>

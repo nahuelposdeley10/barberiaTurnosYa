@@ -629,7 +629,8 @@ input[type='time'] {
 
 .admin-login {
   align-items: center;
-  margin-top: 8vh;
+  justify-content: center;
+  min-height: calc(100vh - 96px);
 }
 
 .login-card {
@@ -831,8 +832,9 @@ input[type='time'] {
 
 .day-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
   padding: 8px 10px;
   border-radius: 10px;
   background: var(--bg-soft);
@@ -844,6 +846,7 @@ input[type='time'] {
 
 .day-name {
   flex: 1;
+  min-width: 0;
   font-weight: 700;
   font-size: 14px;
 }
@@ -854,9 +857,30 @@ input[type='time'] {
   accent-color: var(--accent);
 }
 
+.time-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .input-time {
   width: auto;
-  flex: 0 0 120px;
+  flex: 0 1 84px;
+  min-width: 0;
+  padding: 8px 4px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+input[type='time']::-webkit-datetime-edit {
+  padding: 0;
+}
+
+input[type='time']::-webkit-datetime-edit-field {
+  padding: 0 1px;
 }
 
 .input-price,
@@ -925,6 +949,8 @@ input[type='time'] {
   }
   .login-form {
     padding: 22px 18px;
+    align-items: center;
+    text-align: center;
   }
   .booking-item {
     grid-template-columns: 52px 1fr;
