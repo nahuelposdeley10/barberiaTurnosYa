@@ -56,6 +56,6 @@ export function ServiceIcon({ service, className = '' }) {
   return <span className={`service-icon ${className}`}>{ICONS[iconFor(service)]}</span>
 }
 
-export function BarberPole() {
-  return <span className="barber-pole" aria-hidden="true" />
+export function BarberPole({ className = '' }) {
+  return <span className={`barber-pole ${className}`.trim()} aria-hidden="true" />
 }

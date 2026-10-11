@@ -4,7 +4,8 @@ import { BarberPole } from './BarberIcons'
 import actionImg from '../assets/action.jpg'
 
 export default function AdminLogin({ onLogin, onBack }) {
-  const [pin, setPin] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -13,7 +14,7 @@ export default function AdminLogin({ onLogin, onBack }) {
     setLoading(true)
     setError('')
     try {
-      const res = await adminLogin(pin.trim())
+      const res = await adminLogin(email.trim(), password)
       onLogin(res.token)
     } catch (err) {
       setError(err.message)
@@ -37,25 +38,37 @@ export default function AdminLogin({ onLogin, onBack }) {
         <div className="login-form">
           <BarberPole />
           <h1>Panel del barbero</h1>
-          <p className="muted">Ingresá tu PIN para administrar los turnos.</p>
+          <p className="muted">Ingresá tu email y contraseña para administrar los turnos.</p>
           {error && <p className="error">{error}</p>}
           <form className="form" onSubmit={handleSubmit}>
             <label className="field">
-              <span>PIN</span>
+              <span>Email</span>
               <input
-                className="input input-pin"
-                type="password"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder="••••"
+                className="input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@email.com"
+                autoComplete="email"
                 autoFocus
+              />
+            </label>
+            <label className="field">
+              <span>Contraseña</span>
+              <input
+                className="input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Tu contraseña"
+                autoComplete="current-password"
               />
             </label>
             <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
               {loading ? 'Ingresando…' : 'Ingresar'}
             </button>
           </form>
-          <p className="muted small">PIN por defecto: 1234 (podés cambiarlo en Configuración)</p>
+          <p className="muted small">Podés cambiar el email y la contraseña desde Configuración.</p>
         </div>
       </div>
     </div>

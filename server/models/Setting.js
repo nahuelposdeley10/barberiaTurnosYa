@@ -25,6 +25,9 @@ const settingSchema = new mongoose.Schema({
   services: { type: [serviceSchema], default: [] },
   days: { type: [daySchema], default: [] },
   slotMinutes: { type: Number, default: 30 },
+  adminEmail: { type: String, default: 'admin@turnobarberya.com' },
+  adminPasswordHash: { type: String, default: '' },
+  // Legacy field kept only so existing installations can migrate from PIN login.
   pin: { type: String, default: '1234' },
   unavailableDates: { type: [String], default: [] },
 })

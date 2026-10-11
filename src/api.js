@@ -25,8 +25,15 @@ export function createBooking(payload) {
   return request('/bookings', { method: 'POST', body: JSON.stringify(payload) })
 }
 
-export function adminLogin(pin) {
-  return request('/admin/login', { method: 'POST', body: JSON.stringify({ pin }) })
+export function cancelBooking(token) {
+  return request(`/bookings/manage/${encodeURIComponent(token)}`, { method: 'DELETE' })
+}
+
+export function adminLogin(email, password) {
+  return request('/admin/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
 }
 
 export function adminGetBookings(token, params = {}) {

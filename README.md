@@ -36,6 +36,8 @@ En Vercel se configuran como variables de entorno: `MONGODB_URI` y `ADMIN_TOKEN`
    ```
    MONGODB_URI=mongodb+srv://usuario:password@cluster.mongodb.net/turnobarberya
    ADMIN_TOKEN=<token-secreto-para-el-panel>
+   ADMIN_EMAIL=admin@turnobarberya.com
+   ADMIN_PASSWORD=<contraseña-inicial>
    PORT=3001
    ```
 
@@ -62,6 +64,6 @@ Abrí `http://localhost:5173`.
 ## Uso
 
 - **Clientes:** eligen servicio, día y hora, y dejan nombre y teléfono. El turno se guarda en la base de datos.
-- **Barbero:** entrá por "Ingreso barbero" con el PIN (por defecto `1234`) y administrá la agenda (confirmar, completar, cancelar, eliminar), los horarios de atención, servicios, días bloqueados y el PIN en la pestaña **Configuración**.
+- **Barbero:** entrá por "Ingreso barbero" con email y contraseña y administrá la agenda (confirmar, completar, cancelar, eliminar), los horarios de atención, servicios, días bloqueados y las credenciales en la pestaña **Configuración**.
 
-> **Importante:** el PIN y el `ADMIN_TOKEN` son solo un control de acceso básico. Para producción, usá autenticación real (contraseñas con hash, HTTPS).
+> **Importante:** la contraseña se guarda como hash. Definí `ADMIN_EMAIL` y `ADMIN_PASSWORD` antes de crear la configuración inicial y usá HTTPS en producción.

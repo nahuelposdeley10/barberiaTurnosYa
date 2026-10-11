@@ -458,13 +458,27 @@ export default function AdminPage({ token, onLogout }) {
 
           <h3 className="group-title">Acceso</h3>
           <label className="field">
-            <span>PIN del panel (mínimo 4 caracteres)</span>
+            <span>Email de acceso</span>
             <input
-              className="input input-pin"
-              value={draft.pin}
-              onChange={(e) => setDraft({ ...draft, pin: e.target.value })}
+              className="input"
+              type="email"
+              value={draft.adminEmail || ''}
+              onChange={(e) => setDraft({ ...draft, adminEmail: e.target.value })}
             />
           </label>
+
+          <label className="field">
+            <span>Nueva contraseña</span>
+            <input
+              className="input"
+              type="password"
+              value={draft.adminPassword || ''}
+              onChange={(e) => setDraft({ ...draft, adminPassword: e.target.value })}
+              placeholder="Dejar vacío para conservarla"
+              autoComplete="new-password"
+            />
+          </label>
+          <p className="muted small">Usá al menos 6 caracteres. La contraseña actual nunca se muestra.</p>
 
           {error && <p className="error">{error}</p>}
           {saved && <p className="ok">Configuración guardada ✓</p>}

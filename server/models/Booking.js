@@ -9,6 +9,7 @@ const bookingSchema = new mongoose.Schema(
     price: { type: Number, default: 0 },
     date: { type: String, required: true },
     time: { type: String, required: true },
+    manageTokenHash: { type: String, default: '', index: true },
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'cancelled', 'done'],

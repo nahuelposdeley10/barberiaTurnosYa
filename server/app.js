@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import crypto from 'node:crypto'
 import mongoose from 'mongoose'
 import Booking from './models/Booking.js'
 import Setting from './models/Setting.js'
@@ -9,6 +10,8 @@ app.use(cors())
 app.use(express.json())
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'turno-admin-token'
+const DEFAULT_ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@turnobarberya.com').trim().toLowerCase()
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '1234'
 
 let dbConnection
 export function connectDB() {
@@ -35,15 +38,50 @@ function defaultSettings() {
     ],
     days,
     slotMinutes: 30,
-    pin: '1234',
+    adminEmail: DEFAULT_ADMIN_EMAIL,
+    adminPasswordHash: hashPassword(DEFAULT_ADMIN_PASSWORD),
+    pin: DEFAULT_ADMIN_PASSWORD,
     unavailableDates: [],
   }
+}
+
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const derivedKey = crypto.scryptSync(password, salt, 64).toString('hex')
+  return `${salt}:${derivedKey}`
+}
+
+function verifyPassword(password, storedHash) {
+  if (typeof storedHash !== 'string') return false
+  const [salt, expectedHex] = storedHash.split(':')
+  if (!salt || !expectedHex || !/^[a-f0-9]+$/i.test(expectedHex)) return false
+  const actual = crypto.scryptSync(password, salt, expectedHex.length / 2)
+  const expected = Buffer.from(expectedHex, 'hex')
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected)
+}
+
+function publicSettings(settings) {
+  const data = settings.toObject()
+  delete data.adminPasswordHash
+  delete data.pin
+  data.adminPassword = ''
+  return data
 }
 
 async function getSettings() {
   let doc = await Setting.findOne()
   if (!doc) {
     doc = await Setting.create(defaultSettings())
+  } else {
+    let changed = false
+    if (!doc.adminEmail) {
+      doc.adminEmail = DEFAULT_ADMIN_EMAIL
+      changed = true
+    }
+    if (!doc.adminPasswordHash) {
+      doc.adminPasswordHash = hashPassword(doc.pin || DEFAULT_ADMIN_PASSWORD)
+      changed = true
+    }
+    if (changed) await doc.save()
   }
   return doc
 }
@@ -80,6 +118,12 @@ function toTime(totalMinutes) {
   const h = String(Math.floor(totalMinutes / 60)).padStart(2, '0')
   const m = String(totalMinutes % 60).padStart(2, '0')
   return `${h}:${m}`
+}
+
+function createManageToken() {
+  const token = crypto.randomBytes(24).toString('hex')
+  const hash = crypto.createHash('sha256').update(token).digest('hex')
+  return { token, hash }
 }
 
 function slotsBetween(open, close, step) {
@@ -248,6 +292,7 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(409).json({ error: 'Ese horario acaba de ser ocupado, elegí otro.' })
     }
 
+    const manageToken = createManageToken()
     const booking = await Booking.create({
       name: name.trim(),
       phone: phone.trim(),
@@ -257,8 +302,43 @@ app.post('/api/bookings', async (req, res) => {
       date: d,
       time,
       status: 'pending',
+      manageTokenHash: manageToken.hash,
     })
-    res.status(201).json(booking)
+    const publicBooking = booking.toObject()
+    delete publicBooking.manageTokenHash
+    res.status(201).json({
+      ...publicBooking,
+      manageToken: manageToken.token,
+      address: 'Te esperamos en el local',
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error del servidor' })
+  }
+})
+
+app.delete('/api/bookings/manage/:token', async (req, res) => {
+  try {
+    const token = typeof req.params.token === 'string' ? req.params.token : ''
+    if (!/^[a-f0-9]{48}$/i.test(token)) {
+      return res.status(404).json({ error: 'Turno no encontrado' })
+    }
+    const hash = crypto.createHash('sha256').update(token).digest('hex')
+    const booking = await Booking.findOne({ manageTokenHash: hash })
+    if (!booking) return res.status(404).json({ error: 'Turno no encontrado' })
+    if (booking.status === 'cancelled') {
+      const publicBooking = booking.toObject()
+      delete publicBooking.manageTokenHash
+      return res.json(publicBooking)
+    }
+    if (booking.status === 'done') {
+      return res.status(409).json({ error: 'No se puede cancelar un turno completado' })
+    }
+    booking.status = 'cancelled'
+    await booking.save()
+    const publicBooking = booking.toObject()
+    delete publicBooking.manageTokenHash
+    res.json(publicBooking)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error del servidor' })
@@ -268,11 +348,12 @@ app.post('/api/bookings', async (req, res) => {
 app.post('/api/admin/login', async (req, res) => {
   try {
     const settings = await getSettings()
-    const { pin } = req.body || {}
-    if (pin === settings.pin) {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : ''
+    const password = typeof req.body?.password === 'string' ? req.body.password : ''
+    if (email === settings.adminEmail && verifyPassword(password, settings.adminPasswordHash)) {
       return res.json({ token: ADMIN_TOKEN })
     }
-    return res.status(401).json({ error: 'PIN incorrecto' })
+    return res.status(401).json({ error: 'Email o contraseña incorrectos' })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error del servidor' })
@@ -291,7 +372,7 @@ app.get('/api/admin/bookings', auth, async (req, res) => {
     if (status && ['pending', 'confirmed', 'cancelled', 'done'].includes(status)) {
       filter.status = status
     }
-    const bookings = await Booking.find(filter).sort({ date: 1, time: 1 })
+    const bookings = await Booking.find(filter).select('-manageTokenHash').sort({ date: 1, time: 1 })
     res.json(bookings)
   } catch (err) {
     console.error(err)
@@ -333,7 +414,7 @@ app.delete('/api/admin/bookings/:id', auth, async (req, res) => {
 
 app.get('/api/admin/settings', auth, async (_req, res) => {
   try {
-    res.json(await getSettings())
+    res.json(publicSettings(await getSettings()))
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error del servidor' })
@@ -371,15 +452,21 @@ app.put('/api/admin/settings', auth, async (req, res) => {
     if (typeof body.slotMinutes === 'number') {
       current.slotMinutes = Math.min(Math.max(Math.round(body.slotMinutes), 10), 120)
     }
-    if (typeof body.pin === 'string' && body.pin.trim().length >= 4) {
-      current.pin = body.pin.trim().slice(0, 20)
+    if (typeof body.adminEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.adminEmail.trim())) {
+      current.adminEmail = body.adminEmail.trim().toLowerCase().slice(0, 120)
+    }
+    if (typeof body.adminPassword === 'string' && body.adminPassword.trim()) {
+      if (body.adminPassword.trim().length < 6) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' })
+      }
+      current.adminPasswordHash = hashPassword(body.adminPassword.trim())
     }
     if (Array.isArray(body.unavailableDates)) {
       current.unavailableDates = [...new Set(body.unavailableDates.filter((x) => normalizeDate(x)))]
     }
 
     await current.save()
-    res.json(current)
+    res.json(publicSettings(current))
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error del servidor' })

@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { createBooking, getAvailability } from '../api'
+import { cancelBooking, createBooking, getAvailability } from '../api'
 import { BarberPole, ServiceIcon } from './BarberIcons'
 import ScheduleCalendar from './ScheduleCalendar'
-import heroImg from '../assets/hero.jpg'
 
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const MONTH_NAMES = [
@@ -35,12 +34,13 @@ export default function BookingPage({ onAdmin }) {
   })()
 
   const [barberName, setBarberName] = useState('Barbería')
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState('Reservá tu turno online, sin esperas.')
   const [services, setServices] = useState([])
   const [slots, setSlots] = useState([])
   const [selectedService, setSelectedService] = useState('')
   const [date, setDate] = useState(today)
   const [selectedSlot, setSelectedSlot] = useState('')
+  const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -48,42 +48,56 @@ export default function BookingPage({ onAdmin }) {
   const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirm, setConfirm] = useState(null)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelled, setCancelled] = useState(false)
 
-  const freeCount = slots.filter((s) => s.free).length
+  const freeCount = slots.filter((slot) => slot.free).length
 
   useEffect(() => {
     document.title = `${barberName} · Reservá tu turno online`
   }, [barberName])
 
   useEffect(() => {
-    let cancelled = false
+    let disposed = false
+    // The loading indicator mirrors the lifecycle of the availability request.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     getAvailability(date, selectedService)
       .then((data) => {
-        if (cancelled) return
-        setBarberName(data.barberName)
-        setMessage(data.message || '')
+        if (disposed) return
+        setBarberName(data.barberName || 'Barbería')
+        setMessage(data.message || 'Reservá tu turno online, sin esperas.')
         setServices(data.services || [])
         setSlots(data.slots || [])
         setError('')
-        if (!selectedService && data.services && data.services.length) {
+        if (!selectedService && data.services?.length) {
           setSelectedService(data.services[0].name)
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message)
+        if (!disposed) setError(err.message)
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!disposed) setLoading(false)
       })
     return () => {
-      cancelled = true
+      disposed = true
     }
   }, [date, selectedService])
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  async function refreshSlots() {
+    try {
+      const data = await getAvailability(date, selectedService)
+      setSlots(data.slots || [])
+      return data
+    } catch (err) {
+      setError(err.message)
+      return null
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
     if (!name.trim() || phone.trim().length < 6) {
       setError('Ingresá tu nombre y un teléfono válido')
       return
@@ -99,9 +113,13 @@ export default function BookingPage({ onAdmin }) {
         time: selectedSlot,
       })
       setConfirm(booking)
+      await refreshSlots()
     } catch (err) {
       setError(err.message)
-      if (/ocupado/.test(err.message)) setSelectedSlot('')
+      if (/ocupado|lleno/i.test(err.message)) {
+        setSelectedSlot('')
+        setStep(3)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -109,190 +127,225 @@ export default function BookingPage({ onAdmin }) {
 
   function resetForm() {
     setConfirm(null)
+    setDate(today)
     setSelectedSlot('')
+    setStep(1)
     setName('')
     setPhone('')
     setError('')
+    setCancelled(false)
+    setCancelling(false)
+  }
+
+  async function handleCancelBooking() {
+    if (!confirm?.manageToken || cancelling) return
+    if (!window.confirm('¿Querés cancelar este turno? El horario volverá a quedar disponible.')) return
+    setCancelling(true)
+    setError('')
+    try {
+      await cancelBooking(confirm.manageToken)
+      setCancelled(true)
+      setConfirm({ ...confirm, status: 'cancelled' })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setCancelling(false)
+    }
   }
 
   if (confirm) {
     return (
-      <div className="page">
-        <div className="card confirm-card">
-          <div className="confirm-icon">✓</div>
-          <h1>¡Turno reservado!</h1>
-          <p>{barberName}</p>
+      <main className="booking-page booking-result-page">
+        <header className="booking-topbar">
+          <div className="booking-brand">
+            <span className="booking-brand-mark">✂</span>
+            <div className="booking-brand-copy">
+              <strong>{barberName}</strong>
+              <span>Reservas online</span>
+            </div>
+          </div>
+          <BarberPole />
+        </header>
+
+        <section className="booking-result">
+          <div className={`result-icon ${cancelled ? 'result-icon-cancelled' : ''}`}>
+            {cancelled ? '×' : '✓'}
+          </div>
+          <p className="booking-eyebrow">{cancelled ? 'Turno cancelado' : 'Listo, ya está'}</p>
+          <h1>{cancelled ? 'Liberamos tu horario' : '¡Solicitud recibida!'}</h1>
+          <p className="booking-result-lead">
+            {cancelled
+              ? 'El horario quedó disponible nuevamente.'
+              : 'Tu turno quedó registrado. Guardá esta pantalla y, si querés, confirmá por WhatsApp con la barbería.'}
+          </p>
+
           <ul className="confirm-list">
-            <li><span>Servicio</span><strong>{confirm.service}</strong></li>
-            <li><span>Fecha</span><strong>{formatDate(confirm.date)}</strong></li>
-            <li><span>Hora</span><strong>{confirm.time}</strong></li>
-            <li><span>Nombre</span><strong>{confirm.name}</strong></li>
-            <li><span>Teléfono</span><strong>{confirm.phone}</strong></li>
-            <li><span>Dirección</span><strong>Te esperamos en el local</strong></li>
+            <ConfirmRow label="Servicio" value={confirm.service} />
+            <ConfirmRow label="Fecha" value={formatDate(confirm.date)} />
+            <ConfirmRow label="Hora" value={`${confirm.time} h`} />
+            <ConfirmRow label="Nombre" value={confirm.name} />
+            <ConfirmRow label="Teléfono" value={confirm.phone} />
+            <ConfirmRow label="Dirección" value={confirm.address || 'Te esperamos en el local'} />
           </ul>
+
+          {!cancelled && confirm.manageToken && (
+            <div className="result-actions">
+              <p className="muted small">Si finalmente no podés asistir, podés cancelar el turno desde acá.</p>
+              <button type="button" className="btn btn-danger btn-block" onClick={handleCancelBooking} disabled={cancelling}>
+                {cancelling ? 'Cancelando…' : 'Cancelar turno'}
+              </button>
+            </div>
+          )}
+          {error && <p className="error" role="alert">{error}</p>}
           <button type="button" className="btn btn-primary" onClick={resetForm}>
             Reservar otro turno
           </button>
-        </div>
-      </div>
+        </section>
+      </main>
     )
   }
 
   return (
-    <div className="page">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">✂</span>
-          <strong>{barberName}</strong>
+    <main className="booking-page">
+      <header className="booking-topbar">
+        <div className="booking-brand">
+          <span className="booking-brand-mark">✂</span>
+          <div className="booking-brand-copy">
+            <strong>{barberName}</strong>
+            <span>Reservas online</span>
+          </div>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={onAdmin}>
-          Ingreso barbero
+        <button type="button" className="booking-admin-link" onClick={onAdmin}>
+          Ingreso barbero <span aria-hidden="true">↗</span>
         </button>
       </header>
 
-      <section className="hero">
-        <img src={heroImg} alt="" className="hero-bg" />
-        <div className="hero-overlay" />
-        <div className="hero-content">
-          <span className="hero-kicker">Barber Shop</span>
-          <h1>Reservá tu turno</h1>
-          <p>{message}</p>
+      <section className="booking-intro">
+        <div className="booking-intro-copy">
+          <span className="booking-eyebrow">Agenda tu visita</span>
+          <h1 className="booking-title">Tu próximo corte empieza acá.</h1>
+          <p className="booking-lead">{message}</p>
+        </div>
+        <aside className="booking-intro-aside" aria-label="Reserva online">
           <BarberPole />
-        </div>
+          <span className="booking-aside-label">Turnos</span>
+          <strong className="booking-aside-value">100% online</strong>
+        </aside>
       </section>
 
-      <section className="features">
-        <span className="feature">Sin esperas</span>
-        <span className="feature">Confirmación al instante</span>
-        <span className="feature">Agenda 100% online</span>
-      </section>
+      <div className="booking-trust" aria-label="Ventajas de reservar online">
+        <span className="booking-trust-item"><b>01</b> Elegís el servicio</span>
+        <span className="booking-trust-item"><b>02</b> Ves horarios reales</span>
+        <span className="booking-trust-item"><b>03</b> Confirmás en segundos</span>
+      </div>
 
-      <section className="card">
-        <h2 className="step-title"><span>1</span> Elegí el servicio</h2>
-        <div className="services-grid">
-          {services.map((s) => (
-            <button
-              key={s.name}
-              type="button"
-              className={`service-card ${selectedService === s.name ? 'active' : ''}`}
-              onClick={() => {
-                setSelectedService(s.name)
-                setSelectedSlot('')
-              }}
-            >
-              <ServiceIcon service={s.name} />
-              <strong>{s.name}</strong>
-              <span>{currency(s.price)} · {s.duration} min</span>
-            </button>
-          ))}
-        </div>
-      </section>
+      <BookingProgress step={step} />
 
-      <section className="card">
-        <h2 className="step-title"><span>2</span> Elegí el día</h2>
-        <ScheduleCalendar
-          value={date}
-          minDate={today}
-          maxDate={maxDate}
-          service={selectedService}
-          onSelect={(d) => {
-            setDate(d)
-            setSelectedSlot('')
-          }}
-        />
-      </section>
+      {step === 1 && (
+        <section className="booking-card">
+          <StepHeading n={1} eyebrow="Paso 1 de 4" title="Elegí tu próximo look" subtitle="Seleccioná un servicio para ver los horarios disponibles." />
+          <div className="booking-services">
+            {services.map((service) => (
+              <button
+                key={service.name}
+                type="button"
+                className={`booking-service ${selectedService === service.name ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedService(service.name)
+                  setDate(today)
+                  setSelectedSlot('')
+                  setStep(2)
+                  setError('')
+                }}
+              >
+                <ServiceIcon service={service.name} />
+                <span className="booking-service-copy">
+                  <strong>{service.name}</strong>
+                  <span>{service.duration} min · {currency(service.price)}</span>
+                </span>
+                <span className="booking-service-arrow" aria-hidden="true">›</span>
+              </button>
+            ))}
+          </div>
+          {loading && services.length === 0 && <p className="empty">Cargando servicios…</p>}
+          {error && services.length === 0 && <p className="error" role="alert">{error}</p>}
+        </section>
+      )}
 
-      <section className="card">
-        <h2 className="step-title"><span>3</span> Elegí la hora</h2>
-        {error && !selectedSlot ? (
-          <p className="error">{error}</p>
-        ) : (
-          <p className="muted">
-            {formatDate(date)} · {selectedService || 'servicio'}
-          </p>
-        )}
-        {loading ? (
-          <p className="muted">Cargando horarios…</p>
-        ) : slots.length === 0 ? (
-          <p className="empty">
-            No hay horarios disponibles para este día. Probá con otra fecha.
-          </p>
-        ) : (
-          <>
-            {freeCount === 0 && (
-              <p className="empty">Este día está lleno, todos los horarios están ocupados.</p>
-            )}
-            <div className="slots-grid">
-              {slots.map((slot) => (
-                <button
-                  key={slot.time}
-                  type="button"
-                  className={`slot-btn ${slot.free ? 'free' : 'taken'} ${
-                    selectedSlot === slot.time ? 'active' : ''
-                  }`}
-                  disabled={!slot.free}
-                  onClick={() => {
-                    setSelectedSlot(slot.time)
-                    setError('')
-                    setPhone('')
-                    setName('')
-                  }}
-                >
-                  {slot.time}
-                </button>
-              ))}
-            </div>
-            <div className="cal-legend">
-              <span className="cal-legend-item">
-                <i className="dot free" />
-                Libre
-              </span>
-              <span className="cal-legend-item">
-                <i className="dot full" />
-                Ocupado
-              </span>
-            </div>
-          </>
-        )}
-      </section>
+      {step === 2 && (
+        <section className="booking-card">
+          <StepHeading n={2} eyebrow="Paso 2 de 4" title="¿Qué día te queda cómodo?" subtitle={`${selectedService} · Elegí una fecha para mostrarte los horarios.`} />
+          {error && <p className="error" role="alert">{error}</p>}
+          <ScheduleCalendar
+            value={date}
+            minDate={today}
+            maxDate={maxDate}
+            service={selectedService}
+            onSelect={(selectedDate) => {
+              setDate(selectedDate)
+              setSelectedSlot('')
+              setStep(3)
+              setError('')
+            }}
+          />
+          <WizardBackButton label="Cambiar servicio" onClick={() => { setSelectedSlot(''); setStep(1) }} />
+        </section>
+      )}
 
-      {selectedSlot && (
-        <section className="card form-card">
-          <h2 className="step-title"><span>4</span> Tus datos</h2>
-          <p className="muted">
-            {selectedService} · {formatDate(date)} a las <strong>{selectedSlot} h</strong>
-          </p>
-          {error && <p className="error">{error}</p>}
-          <form className="form" onSubmit={handleSubmit}>
+      {step === 3 && date && (
+        <section className="booking-card">
+          <StepHeading n={3} eyebrow="Paso 3 de 4" title="Elegí un horario" subtitle={`${selectedService} · ${formatDate(date)}`} />
+          {error && <p className="error" role="alert">{error}</p>}
+          {loading ? (
+            <p className="empty">Cargando horarios…</p>
+          ) : slots.length === 0 ? (
+            <p className="empty">No hay horarios disponibles para este día. Probá con otra fecha.</p>
+          ) : (
+            <>
+              {freeCount === 0 && <p className="empty">Este día está lleno. Probá con otra fecha.</p>}
+              <div className="slots-grid">
+                {slots.map((slot) => (
+                  <button
+                    key={slot.time}
+                    type="button"
+                    className={`slot-btn ${slot.free ? 'free' : 'taken'} ${selectedSlot === slot.time ? 'active' : ''}`}
+                    disabled={!slot.free}
+                    onClick={() => {
+                      setSelectedSlot(slot.time)
+                      setStep(4)
+                      setError('')
+                    }}
+                  >
+                    {slot.time}
+                  </button>
+                ))}
+              </div>
+              <div className="cal-legend">
+                <span className="cal-legend-item"><i className="dot free" /> Libre</span>
+                <span className="cal-legend-item"><i className="dot full" /> Ocupado</span>
+              </div>
+            </>
+          )}
+          <WizardBackButton label="Cambiar fecha" onClick={() => { setSelectedSlot(''); setStep(2) }} />
+        </section>
+      )}
+
+      {step === 4 && selectedSlot && (
+        <section className="booking-card booking-form-card">
+          <StepHeading n={4} eyebrow="Paso 4 de 4" title="Confirmá tus datos" subtitle={`${selectedService} · ${formatDate(date)} a las ${selectedSlot} h`} />
+          {error && <p className="error" role="alert">{error}</p>}
+          <form className="booking-form" onSubmit={handleSubmit}>
             <label className="field">
               <span>Nombre</span>
-              <input
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Tu nombre"
-                autoComplete="name"
-              />
+              <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Tu nombre" autoComplete="name" />
             </label>
             <label className="field">
               <span>Teléfono / WhatsApp</span>
-              <input
-                className="input"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Ej: 1155667788"
-                inputMode="tel"
-                autoComplete="tel"
-              />
+              <input className="input" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Ej: 1155667788" inputMode="tel" autoComplete="tel" />
             </label>
+            <p className="booking-note">Al confirmar, tu solicitud queda registrada en la agenda de la barbería.</p>
             <div className="form-actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setSelectedSlot('')}
-              >
-                Volver
-              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => setStep(3)}>Cambiar horario</button>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
                 {submitting ? 'Reservando…' : 'Confirmar turno'}
               </button>
@@ -300,6 +353,55 @@ export default function BookingPage({ onAdmin }) {
           </form>
         </section>
       )}
+    </main>
+  )
+}
+
+function BookingProgress({ step }) {
+  const items = [
+    { n: 1, label: 'Servicio' },
+    { n: 2, label: 'Fecha' },
+    { n: 3, label: 'Horario' },
+    { n: 4, label: 'Datos' },
+  ]
+
+  return (
+    <nav className="booking-progress" aria-label="Progreso de la reserva">
+      {items.map((item, index) => (
+        <div key={item.n} className={`booking-progress-step ${item.n === step ? 'current' : ''} ${item.n < step ? 'complete' : ''}`}>
+          {index > 0 && <span className="booking-progress-line" aria-hidden="true" />}
+          <span className="booking-progress-dot" aria-current={item.n === step ? 'step' : undefined}>
+            {item.n < step ? '✓' : item.n}
+          </span>
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </nav>
+  )
+}
+
+function StepHeading({ n, eyebrow, title, subtitle }) {
+  return (
+    <div className="booking-step-heading">
+      <span className="step-number">{n}</span>
+      <div>
+        <p className="booking-step-eyebrow">{eyebrow}</p>
+        <h2 className="booking-step-title">{title}</h2>
+        <p className="booking-step-subtitle">{subtitle}</p>
+      </div>
     </div>
+  )
+}
+
+function WizardBackButton({ label, onClick }) {
+  return <button type="button" className="wizard-back" onClick={onClick}>← {label}</button>
+}
+
+function ConfirmRow({ label, value }) {
+  return (
+    <li>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </li>
   )
 }
