@@ -15,6 +15,8 @@ const serviceSchema = new mongoose.Schema(
     name: { type: String, required: true },
     price: { type: Number, default: 0 },
     duration: { type: Number, default: 30 },
+    icon: { type: String, default: '' },
+    color: { type: String, default: '' },
   },
   { _id: false }
 )

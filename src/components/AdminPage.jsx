@@ -6,7 +6,8 @@ import {
   adminUpdateBooking,
   adminUpdateSettings,
 } from '../api'
-import { BarberPole } from './BarberIcons'
+import { BarberPole, ServiceIcon } from './BarberIcons'
+import { SERVICE_ICONS } from './iconPalette'
 
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const MONTH_NAMES = [
@@ -120,7 +121,7 @@ export default function AdminPage({ token, onLogout }) {
   function addService() {
     setDraft({
       ...draft,
-      services: [...draft.services, { name: '', price: 0, duration: 30 }],
+      services: [...draft.services, { name: '', price: 0, duration: 30, icon: '', color: '' }],
     })
   }
 
@@ -338,43 +339,86 @@ export default function AdminPage({ token, onLogout }) {
           <p className="muted small">El precio se muestra al cliente. La duración evita cruces de turnos.</p>
           <div className="services-editor">
             {draft.services.map((s, i) => (
-              <div key={i} className="service-row">
-                <input
-                  className="input"
-                  value={s.name}
-                  placeholder="Nombre del servicio"
-                  onChange={(e) => updateDraftService(i, 'name', e.target.value)}
-                />
-                <input
-                  className="input input-price"
-                  type="number"
-                  min="0"
-                  value={s.price}
-                  onChange={(e) => updateDraftService(i, 'price', e.target.value)}
-                />
-                <input
-                  className="input input-duration"
-                  type="number"
-                  min="5"
-                  step="5"
-                  value={s.duration}
-                  onChange={(e) => updateDraftService(i, 'duration', e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="btn btn-small btn-danger"
-                  onClick={() => removeService(i)}
-                  disabled={draft.services.length <= 1}
-                >
-                  Quitar
-                </button>
+              <div key={i} className="service-editor">
+                <div className="service-row">
+                  <input
+                    className="input"
+                    value={s.name}
+                    placeholder="Nombre del servicio"
+                    onChange={(e) => updateDraftService(i, 'name', e.target.value)}
+                  />
+                  <input
+                    className="input input-price"
+                    type="number"
+                    min="0"
+                    value={s.price}
+                    onChange={(e) => updateDraftService(i, 'price', e.target.value)}
+                  />
+                  <input
+                    className="input input-duration"
+                    type="number"
+                    min="5"
+                    step="5"
+                    value={s.duration}
+                    onChange={(e) => updateDraftService(i, 'duration', e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-small btn-danger"
+                    onClick={() => removeService(i)}
+                    disabled={draft.services.length <= 1}
+                  >
+                    Quitar
+                  </button>
+                </div>
+
+                <div className="service-visual">
+                  <span className="service-visual-label">Icono</span>
+                  <div className="icon-picker" role="group" aria-label={`Icono de ${s.name || 'servicio'}`}>
+                    {SERVICE_ICONS.map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        title={opt.label}
+                        aria-label={opt.label}
+                        aria-pressed={s.icon === opt.key}
+                        className={`icon-choice ${s.icon === opt.key ? 'active' : ''}`}
+                        style={s.icon === opt.key && s.color ? { color: s.color } : undefined}
+                        onClick={() => updateDraftService(i, 'icon', s.icon === opt.key ? '' : opt.key)}
+                      >
+                        <ServiceIcon service={s.name} icon={opt.key} />
+                      </button>
+                    ))}
+                  </div>
+
+                  <span className="service-visual-label">Color</span>
+                  <div className="color-picker">
+                    <input
+                      type="color"
+                      className="color-input"
+                      value={s.color || '#f0b35c'}
+                      aria-label="Color del servicio"
+                      onChange={(e) => updateDraftService(i, 'color', e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-small btn-ghost"
+                      title="Quitar color y usar el color por defecto"
+                      onClick={() => updateDraftService(i, 'color', '')}
+                      disabled={!s.color}
+                    >
+                      Por defecto
+                    </button>
+                    <span className="color-swatch" style={{ background: s.color || 'var(--accent)' }} />
+                  </div>
+                </div>
               </div>
             ))}
             <button type="button" className="btn btn-ghost" onClick={addService}>
               + Agregar servicio
             </button>
           </div>
-          <p className="muted small">Los precios y las duraciones son en $ y en minutos.</p>
+          <p className="muted small">Los precios y las duraciones son en $ y en minutos. El icono y el color se ven en la página de reservas.</p>
 
           <h3 className="group-title">Horarios de atención</h3>
           <div className="days-editor">

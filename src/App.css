@@ -848,6 +848,108 @@ input[type='time'] {
   gap: 8px;
 }
 
+.service-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+
+.service-visual {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.service-visual-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.icon-choice {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--muted);
+  transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.icon-choice .service-icon {
+  width: auto;
+  height: auto;
+  margin: 0;
+  background: none;
+  color: inherit;
+}
+
+.icon-choice .service-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.icon-choice:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.icon-choice.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(240, 179, 92, 0.2);
+}
+
+.color-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-input {
+  width: 38px;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-input::-webkit-color-swatch {
+  border: 0;
+  border-radius: 6px;
+}
+
+.color-swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+}
+
 .days-editor {
   display: flex;
   flex-direction: column;
@@ -1642,6 +1744,7 @@ input[type='time']::-webkit-datetime-edit-field {
 }
 
 .booking-service {
+  --service-accent: var(--accent);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1655,11 +1758,16 @@ input[type='time']::-webkit-datetime-edit-field {
   transition: border-color 0.15s, background 0.15s, transform 0.15s;
 }
 
+.booking-service .service-icon {
+  background: color-mix(in srgb, var(--service-accent) 16%, transparent);
+  color: var(--service-accent);
+}
+
 .booking-service:hover,
 .booking-service:focus-visible,
 .booking-service.active {
-  border-color: var(--accent);
-  background: var(--accent-bg);
+  border-color: var(--service-accent);
+  background: color-mix(in srgb, var(--service-accent) 12%, transparent);
 }
 
 .booking-service:active {
@@ -1686,7 +1794,7 @@ input[type='time']::-webkit-datetime-edit-field {
 }
 
 .booking-service.active .booking-service-copy span {
-  color: var(--accent);
+  color: var(--service-accent);
 }
 
 .booking-service-arrow {
@@ -1697,7 +1805,7 @@ input[type='time']::-webkit-datetime-edit-field {
 
 .booking-service:hover .booking-service-arrow,
 .booking-service:focus-visible .booking-service-arrow {
-  color: var(--accent);
+  color: var(--service-accent);
 }
 
 .booking-form-card {

@@ -466,6 +466,7 @@ export default function BookingPage({ onAdmin }) {
                 key={service.name}
                 type="button"
                 className={`booking-service ${selectedService === service.name ? 'active' : ''}`}
+                style={service.color ? { '--service-accent': service.color } : undefined}
                 onClick={() => {
                   setSelectedService(service.name)
                   setDate('')
@@ -474,7 +475,7 @@ export default function BookingPage({ onAdmin }) {
                   setError('')
                 }}
               >
-                <ServiceIcon service={service.name} />
+                <ServiceIcon service={service.name} icon={service.icon} />
                 <span className="booking-service-copy">
                   <strong>{service.name}</strong>
                   <span>{service.duration} min · {currency(service.price)}</span>

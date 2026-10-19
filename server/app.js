@@ -498,6 +498,9 @@ app.put('/api/admin/settings', auth, async (req, res) => {
           name: s.name.trim().slice(0, 60),
           price: Number(s.price) || 0,
           duration: Math.min(Math.max(Number(s.duration) || 30, 5), 480),
+          // Icono y color son opcionales; se validan para no guardar basura.
+          icon: typeof s.icon === 'string' && /^[a-z0-9-]{1,32}$/.test(s.icon) ? s.icon : '',
+          color: typeof s.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(s.color) ? s.color : '',
         }))
     }
     if (Array.isArray(body.days) && body.days.length === 7) {
