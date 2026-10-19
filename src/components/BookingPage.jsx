@@ -11,6 +11,12 @@ const MONTH_NAMES = [
 const HERO_IMG = 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=1400&auto=format&fit=crop'
 const ACTIVE_BOOKING_KEY = 'turnobarberya:active-booking'
 const CLOSE_COUNTDOWN = 3
+const STATUS_LABELS = {
+  pending: 'Pendiente',
+  confirmed: 'Confirmado',
+  cancelled: 'Cancelado',
+  done: 'Completado',
+}
 
 function localDateStr(d) {
   const y = d.getFullYear()
@@ -579,6 +585,7 @@ function ActiveBookingRow({ booking, onCancel, cancelling }) {
   const dayNum = d.getDate()
   const monthShort = MONTH_NAMES[d.getMonth()].slice(0, 3)
   const dayName = DAY_NAMES[d.getDay()]
+  const status = STATUS_LABELS[booking.status] || 'Activo'
 
   return (
     <li className="active-booking-row">
@@ -586,16 +593,31 @@ function ActiveBookingRow({ booking, onCancel, cancelling }) {
         <small>{monthShort}</small>
         <strong>{dayNum}</strong>
       </span>
+
       <div className="active-booking-info">
-        <strong>{booking.service}</strong>
-        <span>
-          {dayName} · {booking.time} h
-          <i className="active-booking-dot" aria-hidden="true" /> Activo
-        </span>
+        <div className="active-booking-top">
+          <strong className="active-booking-service">{booking.service}</strong>
+          <span className={`booking-status booking-status-${booking.status}`}>{status}</span>
+        </div>
+        <div className="active-booking-meta">
+          <span className="active-booking-meta-item">
+            <i className="meta-ico" aria-hidden="true">◷</i>
+            {dayName} {booking.time} h
+          </span>
+          <span className="active-booking-meta-item">
+            <i className="meta-ico" aria-hidden="true">⏱</i>
+            {booking.duration} min
+          </span>
+          <span className="active-booking-meta-item active-booking-price">
+            <i className="meta-ico" aria-hidden="true">$</i>
+            {currency(booking.price)}
+          </span>
+        </div>
       </div>
+
       <button
         type="button"
-        className="btn btn-danger"
+        className="btn btn-ghost btn-small active-booking-cancel"
         onClick={() => onCancel(booking.manageToken)}
         disabled={cancelling}
       >
