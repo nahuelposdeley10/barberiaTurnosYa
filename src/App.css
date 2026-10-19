@@ -1688,6 +1688,69 @@ input[type='time']::-webkit-datetime-edit-field {
   text-align: left;
 }
 
+.result-countdown {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-top: 4px;
+}
+
+.result-countdown-ring {
+  width: 44px;
+  height: 44px;
+  transform: rotate(-90deg);
+}
+
+.result-countdown-track,
+.result-countdown-progress {
+  fill: none;
+  stroke-width: 3;
+}
+
+.result-countdown-track {
+  stroke: var(--border);
+}
+
+.result-countdown-progress {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 119.4;
+  stroke-dashoffset: 0;
+  animation-name: countdown-drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes countdown-drain {
+  to {
+    stroke-dashoffset: 119.4;
+  }
+}
+
+.result-countdown-number {
+  position: absolute;
+  top: 0;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.result-countdown-label {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-countdown-progress {
+    animation: none;
+  }
+}
+
 .confirm-list {
   display: flex;
   flex-direction: column;

@@ -10,6 +10,7 @@ const MONTH_NAMES = [
 ]
 const HERO_IMG = 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=1400&auto=format&fit=crop'
 const ACTIVE_BOOKING_KEY = 'turnobarberya:active-booking'
+const CLOSE_COUNTDOWN = 3
 
 function localDateStr(d) {
   const y = d.getFullYear()
@@ -88,6 +89,7 @@ export default function BookingPage({ onAdmin }) {
   const [restoringBooking, setRestoringBooking] = useState(true)
   const [cancelling, setCancelling] = useState(false)
   const [cancelled, setCancelled] = useState(false)
+  const [countdown, setCountdown] = useState(CLOSE_COUNTDOWN)
 
   const freeCount = slots.filter((slot) => slot.free).length
 
@@ -179,17 +181,28 @@ export default function BookingPage({ onAdmin }) {
     }
   }, [date, selectedService, today])
 
-  // La pantalla de confirmación se cierra sola a los 3 segundos y vuelve al
-  // asistente, donde ya queda el panel "Tus turnos activos".
+  // La pantalla de confirmación se cierra sola a los pocos segundos y vuelve al
+  // asistente, donde ya queda el panel "Tus turnos activos". Mientras tanto se
+  // muestra un contador para que el usuario sepa que está por cerrarse.
   useEffect(() => {
     if (!confirm || cancelled) return undefined
-    const timer = window.setTimeout(() => {
-      setConfirm(null)
-      setCancelled(false)
-      setStep(1)
-      setSelectedSlot('')
-    }, 3000)
-    return () => window.clearTimeout(timer)
+    // Reseteamos el contador cuando aparece una nueva confirmación.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCountdown(CLOSE_COUNTDOWN)
+    const interval = window.setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(interval)
+          setConfirm(null)
+          setCancelled(false)
+          setStep(1)
+          setSelectedSlot('')
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => window.clearInterval(interval)
   }, [confirm, cancelled])
 
   async function refreshSlots() {
@@ -360,6 +373,23 @@ export default function BookingPage({ onAdmin }) {
           <button type="button" className="btn btn-primary" onClick={resetForm}>
             Reservar otro turno
           </button>
+
+          {!cancelled && confirm.manageToken && (
+            <div className="result-countdown" role="status" aria-live="polite">
+              <svg className="result-countdown-ring" viewBox="0 0 44 44" aria-hidden="true">
+                <circle className="result-countdown-track" cx="22" cy="22" r="19" />
+                <circle
+                  className="result-countdown-progress"
+                  cx="22"
+                  cy="22"
+                  r="19"
+                  style={{ animationDuration: `${CLOSE_COUNTDOWN}s` }}
+                />
+              </svg>
+              <span className="result-countdown-number">{countdown}</span>
+              <span className="result-countdown-label">Volviendo a tu agenda en {countdown}…</span>
+            </div>
+          )}
         </section>
       </main>
     )
