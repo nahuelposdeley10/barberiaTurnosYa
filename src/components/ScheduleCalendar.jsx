@@ -106,6 +106,13 @@ export default function ScheduleCalendar({ value, minDate, maxDate, service, onS
           const isPast = ds < minDate
           const isBeyond = ds > maxDate
           const clickable = !isPast && !isBeyond && status === 'free'
+          const statusLabel = status === 'free'
+            ? 'con horarios disponibles'
+            : status === 'full'
+              ? 'completo'
+              : status === 'closed'
+                ? 'sin atención'
+                : 'disponibilidad no cargada'
           const classes = [
             'cal-day',
             inMonth ? '' : 'outside',
@@ -121,6 +128,8 @@ export default function ScheduleCalendar({ value, minDate, maxDate, service, onS
               type="button"
               className={classes}
               disabled={!clickable}
+              aria-label={`${day} de ${MONTH_NAMES[display.m]} de ${display.y}, ${statusLabel}`}
+              aria-pressed={ds === value}
               onClick={() => onSelect(ds)}
             >
               {day}
@@ -133,9 +142,9 @@ export default function ScheduleCalendar({ value, minDate, maxDate, service, onS
       {loading && <p className="muted small">Actualizando disponibilidad…</p>}
 
       <div className="cal-legend">
-        <span className="cal-legend-item"><i className="dot free" />Con turnos</span>
+        <span className="cal-legend-item"><i className="dot free" />Disponible</span>
         <span className="cal-legend-item"><i className="dot full" />Día lleno</span>
-        <span className="cal-legend-item"><i className="dot closed" />No se atiende</span>
+        <span className="cal-legend-item"><i className="dot closed" />No atendemos</span>
       </div>
     </div>
   )
