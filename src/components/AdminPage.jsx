@@ -420,6 +420,26 @@ export default function AdminPage({ token, onLogout }) {
             />
           </label>
 
+          <label className="field">
+            <span>Cantidad de barberos (sillas)</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              className="input input-duration"
+              value={draft.cantidadBarberos ?? 1}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  cantidadBarberos: Math.max(1, Number(e.target.value) || 1),
+                })
+              }
+            />
+            <span className="muted small">
+              Cada silla permite un turno al mismo tiempo. Por ejemplo, con 3 sillas pueden reservarse hasta 3 turnos para las 10:00.
+            </span>
+          </label>
+
           <h3 className="group-title">Días sin atención</h3>
           <div className="blocks-row">
             <input

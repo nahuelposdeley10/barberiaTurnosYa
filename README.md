@@ -64,6 +64,8 @@ Abrí `http://localhost:5173`.
 ## Uso
 
 - **Clientes:** eligen servicio, día y hora, y dejan nombre y teléfono. El turno se guarda en la base de datos.
-- **Barbero:** entrá por "Ingreso barbero" con email y contraseña y administrá la agenda (confirmar, completar, cancelar, eliminar), los horarios de atención, servicios, días bloqueados y las credenciales en la pestaña **Configuración**.
+- **Barbero:** entrá por "Ingreso barbero" con email y contraseña y administrá la agenda (confirmar, completar, cancelar, eliminar), los horarios de atención, servicios, días bloqueados, cantidad de barberos/sillas y las credenciales en la pestaña **Configuración**.
+
+La **cantidad de barberos (sillas)** se guarda en MongoDB y se aplica en todo el flujo: con 3 sillas se permiten hasta 3 reservas simultáneas para el mismo horario; el backend vuelve a validar la capacidad al confirmar cada reserva para evitar sobreventa y el frontend muestra la ocupación actual de cada horario.
 
 > **Importante:** la contraseña se guarda como hash. Definí `ADMIN_EMAIL` y `ADMIN_PASSWORD` antes de crear la configuración inicial y usá HTTPS en producción.

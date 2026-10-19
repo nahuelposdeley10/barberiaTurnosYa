@@ -316,7 +316,10 @@ export default function BookingPage({ onAdmin }) {
                       setError('')
                     }}
                   >
-                    {slot.time}
+                    <span>{slot.time}</span>
+                    {Number.isFinite(slot.sillas) && (
+                      <small>{slot.ocupadas || 0}/{slot.sillas} sillas</small>
+                    )}
                   </button>
                 ))}
               </div>

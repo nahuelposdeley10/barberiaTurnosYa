@@ -3,6 +3,7 @@ import cors from 'cors'
 import crypto from 'node:crypto'
 import mongoose from 'mongoose'
 import Booking from './models/Booking.js'
+import BookingLock from './models/BookingLock.js'
 import Setting from './models/Setting.js'
 
 const app = express()
@@ -38,6 +39,7 @@ function defaultSettings() {
     ],
     days,
     slotMinutes: 30,
+    cantidadBarberos: 1,
     adminEmail: DEFAULT_ADMIN_EMAIL,
     adminPasswordHash: hashPassword(DEFAULT_ADMIN_PASSWORD),
     pin: DEFAULT_ADMIN_PASSWORD,
@@ -79,6 +81,10 @@ async function getSettings() {
     }
     if (!doc.adminPasswordHash) {
       doc.adminPasswordHash = hashPassword(doc.pin || DEFAULT_ADMIN_PASSWORD)
+      changed = true
+    }
+    if (!Number.isFinite(doc.cantidadBarberos) || doc.cantidadBarberos < 1) {
+      doc.cantidadBarberos = 1
       changed = true
     }
     if (changed) await doc.save()
@@ -136,6 +142,10 @@ function slotsBetween(open, close, step) {
   return slots
 }
 
+function bookingCapacity(settings) {
+  return Math.max(1, Math.round(Number(settings.cantidadBarberos) || 1))
+}
+
 function overlaps(startA, durA, startB, durB) {
   return startA < startB + durB && startB < startA + durA
 }
@@ -166,13 +176,19 @@ app.get('/api/availability', async (req, res) => {
       const serviceName = req.query.service || ''
       const service = settings.services.find((s) => s.name === serviceName)
       const duration = service ? service.duration : settings.slotMinutes
+      const sillas = bookingCapacity(settings)
       const openings = await Booking.find({ date, status: { $ne: 'cancelled' } })
+      const now = new Date()
+      const nowMinutes = now.getHours() * 60 + now.getMinutes()
+      const isToday = date === today
       slots = slotsBetween(dayCfg.open, dayCfg.close, settings.slotMinutes).map((time) => {
         const start = toMinutes(time)
-        const free = !openings.some((b) =>
+        const past = isToday && start <= nowMinutes
+        const ocupadas = openings.filter((b) =>
           overlaps(start, duration, toMinutes(b.time), b.duration)
-        )
-        return { time, free }
+        ).length
+        const free = !past && ocupadas < sillas
+        return { time, free, ocupadas, sillas }
       })
     }
 
@@ -198,6 +214,7 @@ app.get('/api/month', async (req, res) => {
     const serviceName = req.query.service || ''
     const service = settings.services.find((s) => s.name === serviceName)
     const duration = service ? service.duration : settings.slotMinutes
+    const sillas = bookingCapacity(settings)
     const today = localDateStr(new Date())
 
     const toDate = new Date(`${from}T00:00:00`)
@@ -234,9 +251,10 @@ app.get('/api/month', async (req, res) => {
             settings.slotMinutes
           ).some((time) => {
             const start = toMinutes(time)
-            return !dayBookings.some((b) =>
+            const ocupadas = dayBookings.filter((b) =>
               overlaps(start, duration, toMinutes(b.time), b.duration)
-            )
+            ).length
+            return ocupadas < sillas
           })
           status = free ? 'free' : 'full'
         }
@@ -284,26 +302,49 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ error: 'Hora fuera del horario de atención' })
     }
 
-    const openings = await Booking.find({ date: d, status: { $ne: 'cancelled' } })
-    const conflict = openings.find((b) =>
-      overlaps(start, serviceCfg.duration, toMinutes(b.time), b.duration)
-    )
-    if (conflict) {
-      return res.status(409).json({ error: 'Ese horario acaba de ser ocupado, elegí otro.' })
-    }
-
     const manageToken = createManageToken()
-    const booking = await Booking.create({
-      name: name.trim(),
-      phone: phone.trim(),
-      service,
-      duration: serviceCfg.duration,
-      price: serviceCfg.price,
-      date: d,
-      time,
-      status: 'pending',
-      manageTokenHash: manageToken.hash,
-    })
+    const session = await mongoose.startSession()
+    let booking
+    try {
+      await session.withTransaction(async () => {
+        // Serializa reservas del mismo día para evitar sobreventa con solicitudes simultáneas.
+        await BookingLock.findOneAndUpdate(
+          { date: d },
+          { $setOnInsert: { date: d } },
+          { upsert: true, new: true, session }
+        )
+        const openings = await Booking.find({ date: d, status: { $ne: 'cancelled' } }).session(session)
+        const sillas = bookingCapacity(settings)
+        const ocupadas = openings.filter((b) =>
+          overlaps(start, serviceCfg.duration, toMinutes(b.time), b.duration)
+        ).length
+        if (ocupadas >= sillas) {
+          const error = new Error('Ese horario está lleno en todas las sillas, elegí otro.')
+          error.code = 'BOOKING_CAPACITY'
+          throw error
+        }
+
+        const created = await Booking.create([{
+          name: name.trim(),
+          phone: phone.trim(),
+          service,
+          duration: serviceCfg.duration,
+          price: serviceCfg.price,
+          date: d,
+          time,
+          status: 'pending',
+          manageTokenHash: manageToken.hash,
+        }], { session })
+        booking = created[0]
+      })
+    } catch (err) {
+      if (err?.code === 'BOOKING_CAPACITY') {
+        return res.status(409).json({ error: err.message })
+      }
+      throw err
+    } finally {
+      await session.endSession()
+    }
     const publicBooking = booking.toObject()
     delete publicBooking.manageTokenHash
     res.status(201).json({
@@ -451,6 +492,9 @@ app.put('/api/admin/settings', auth, async (req, res) => {
     }
     if (typeof body.slotMinutes === 'number') {
       current.slotMinutes = Math.min(Math.max(Math.round(body.slotMinutes), 10), 120)
+    }
+    if (typeof body.cantidadBarberos === 'number') {
+      current.cantidadBarberos = Math.max(1, Math.round(body.cantidadBarberos))
     }
     if (typeof body.adminEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.adminEmail.trim())) {
       current.adminEmail = body.adminEmail.trim().toLowerCase().slice(0, 120)
