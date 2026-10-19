@@ -1353,6 +1353,135 @@ input[type='time']::-webkit-datetime-edit-field {
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2);
 }
 
+.active-bookings-card {
+  min-height: 0;
+  gap: 14px;
+  border-top-color: var(--green);
+}
+
+.active-bookings-head p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.active-bookings-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.active-bookings-title h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+}
+
+.active-bookings-count {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.16);
+  color: var(--green);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.active-bookings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.active-booking-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-2);
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.active-booking-row:hover {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.booking-cal-badge {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 46px;
+  padding: 5px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--card);
+  line-height: 1;
+}
+
+.booking-cal-badge small {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.booking-cal-badge strong {
+  margin-top: 3px;
+  font-size: 19px;
+}
+
+.active-booking-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.active-booking-info strong {
+  font-size: 14.5px;
+}
+
+.active-booking-info span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.active-booking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.active-booking-row .btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+@media (max-width: 420px) {
+  .active-booking-row {
+    flex-wrap: wrap;
+  }
+
+  .active-booking-row .btn {
+    width: 100%;
+  }
+}
+
 .booking-step-heading {
   display: flex;
   align-items: flex-start;

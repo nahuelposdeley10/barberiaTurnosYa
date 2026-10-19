@@ -27,6 +27,40 @@ function currency(n) {
   return `$${Number(n || 0).toLocaleString('es-AR')}`
 }
 
+// Lee todos los turnos guardados. Soporta el formato viejo (un solo objeto)
+// y el nuevo (array de { manageToken }).
+function readStoredBookings() {
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_BOOKING_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item) => item && typeof item.manageToken === 'string')
+    }
+    if (parsed && typeof parsed.manageToken === 'string') {
+      return [{ manageToken: parsed.manageToken }]
+    }
+    return []
+  } catch {
+    window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
+    return []
+  }
+}
+
+function writeStoredBookings(bookings) {
+  const tokens = bookings
+    .map((booking) => booking.manageToken)
+    .filter((token) => typeof token === 'string' && token)
+  if (tokens.length === 0) {
+    window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
+    return
+  }
+  window.localStorage.setItem(
+    ACTIVE_BOOKING_KEY,
+    JSON.stringify(tokens.map((manageToken) => ({ manageToken })))
+  )
+}
+
 export default function BookingPage({ onAdmin }) {
   const today = localDateStr(new Date())
   const maxDate = (() => {
@@ -50,6 +84,7 @@ export default function BookingPage({ onAdmin }) {
   const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirm, setConfirm] = useState(null)
+  const [activeBookings, setActiveBookings] = useState([])
   const [restoringBooking, setRestoringBooking] = useState(true)
   const [cancelling, setCancelling] = useState(false)
   const [cancelled, setCancelled] = useState(false)
@@ -62,14 +97,9 @@ export default function BookingPage({ onAdmin }) {
 
   useEffect(() => {
     let disposed = false
-    let stored
-    try {
-      stored = JSON.parse(window.localStorage.getItem(ACTIVE_BOOKING_KEY) || 'null')
-    } catch {
-      window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
-    }
+    const stored = readStoredBookings()
 
-    if (!stored?.manageToken) {
+    if (stored.length === 0) {
       // The restore check synchronizes the initial localStorage read with the loading state.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRestoringBooking(false)
@@ -78,21 +108,37 @@ export default function BookingPage({ onAdmin }) {
       }
     }
 
-    getManagedBooking(stored.manageToken)
-      .then((booking) => {
+    Promise.all(
+      stored.map((item) =>
+        getManagedBooking(item.manageToken).then(
+          (booking) => ({ ok: true, booking, manageToken: item.manageToken }),
+          (err) => ({ ok: false, err, manageToken: item.manageToken })
+        )
+      )
+    )
+      .then((results) => {
         if (disposed) return
-        if (booking.status === 'done' || booking.status === 'cancelled') {
-          window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
-          return
+        const valid = []
+        const keep = []
+        let networkError = false
+        for (const result of results) {
+          if (result.ok) {
+            if (result.booking.status === 'done' || result.booking.status === 'cancelled') continue
+            valid.push({ ...result.booking, manageToken: result.manageToken })
+            keep.push({ manageToken: result.manageToken })
+          } else if (result.err.status === 404) {
+            continue
+          } else {
+            // No pudimos verificarlo: lo conservamos en storage por si es transitorio.
+            networkError = true
+            keep.push({ manageToken: result.manageToken })
+          }
         }
-        setConfirm({ ...booking, manageToken: stored.manageToken })
-        setCancelled(false)
-      })
-      .catch((err) => {
-        if (disposed) return
-        if (err.status === 404) {
-          window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
-        } else {
+        writeStoredBookings(keep)
+        // Solo poblamos el panel de turnos activos. No mostramos la pantalla de
+        // confirmación al recargar: el panel "Tus turnos activos" ya la reemplaza.
+        setActiveBookings(valid)
+        if (networkError) {
           setError('No pudimos revisar tu turno guardado. Volvé a intentar en unos segundos.')
         }
       })
@@ -133,6 +179,19 @@ export default function BookingPage({ onAdmin }) {
     }
   }, [date, selectedService, today])
 
+  // La pantalla de confirmación se cierra sola a los 3 segundos y vuelve al
+  // asistente, donde ya queda el panel "Tus turnos activos".
+  useEffect(() => {
+    if (!confirm || cancelled) return undefined
+    const timer = window.setTimeout(() => {
+      setConfirm(null)
+      setCancelled(false)
+      setStep(1)
+      setSelectedSlot('')
+    }, 3000)
+    return () => window.clearTimeout(timer)
+  }, [confirm, cancelled])
+
   async function refreshSlots() {
     try {
       const data = await getAvailability(date || today, selectedService)
@@ -161,11 +220,14 @@ export default function BookingPage({ onAdmin }) {
         time: selectedSlot,
       })
       setConfirm(booking)
+      setCancelled(false)
       if (booking.manageToken) {
-        window.localStorage.setItem(
-          ACTIVE_BOOKING_KEY,
-          JSON.stringify({ manageToken: booking.manageToken })
-        )
+        const next = [
+          ...activeBookings.filter((item) => item.manageToken !== booking.manageToken),
+          booking,
+        ]
+        setActiveBookings(next)
+        writeStoredBookings(next)
       }
       await refreshSlots()
     } catch (err) {
@@ -179,8 +241,9 @@ export default function BookingPage({ onAdmin }) {
     }
   }
 
+  // Volvemos al formulario pero NO borramos los turnos activos guardados:
+  // siguen visibles en el panel para poder cancelarlos.
   function resetForm() {
-    window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
     setConfirm(null)
     setDate('')
     setSelectedSlot('')
@@ -192,16 +255,25 @@ export default function BookingPage({ onAdmin }) {
     setCancelling(false)
   }
 
-  async function handleCancelBooking() {
-    if (!confirm?.manageToken || cancelling) return
+  async function handleCancelBooking(manageToken) {
+    if (!manageToken || cancelling) return
     if (!window.confirm('¿Querés cancelar este turno? El horario volverá a quedar disponible.')) return
     setCancelling(true)
     setError('')
     try {
-      await cancelBooking(confirm.manageToken)
-      window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
-      setCancelled(true)
-      setConfirm({ ...confirm, status: 'cancelled' })
+      const updated = await cancelBooking(manageToken)
+      const remaining = activeBookings.filter((item) => item.manageToken !== manageToken)
+      setActiveBookings(remaining)
+      writeStoredBookings(remaining)
+      if (confirm?.manageToken === manageToken) {
+        if (remaining.length > 0) {
+          setConfirm(remaining[0])
+          setCancelled(false)
+        } else {
+          setConfirm({ ...updated, manageToken })
+          setCancelled(true)
+        }
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -222,6 +294,9 @@ export default function BookingPage({ onAdmin }) {
   }
 
   if (confirm) {
+    const otherBookings = activeBookings.filter(
+      (item) => item.manageToken !== confirm.manageToken
+    )
     return (
       <main className="booking-page booking-result-page">
         <header className="booking-topbar">
@@ -259,11 +334,28 @@ export default function BookingPage({ onAdmin }) {
           {!cancelled && confirm.manageToken && (
             <div className="result-actions">
               <p className="muted small">Si finalmente no podés asistir, podés cancelar el turno desde acá.</p>
-              <button type="button" className="btn btn-danger btn-block" onClick={handleCancelBooking} disabled={cancelling}>
+              <button type="button" className="btn btn-danger btn-block" onClick={() => handleCancelBooking(confirm.manageToken)} disabled={cancelling}>
                 {cancelling ? 'Cancelando…' : 'Cancelar turno'}
               </button>
             </div>
           )}
+
+          {!cancelled && otherBookings.length > 0 && (
+            <div className="result-actions">
+              <p className="muted small">Tus otros turnos activos:</p>
+              <ul className="active-bookings">
+                {otherBookings.map((booking) => (
+                  <ActiveBookingRow
+                    key={booking.manageToken}
+                    booking={booking}
+                    onCancel={handleCancelBooking}
+                    cancelling={cancelling}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+
           {error && <p className="error" role="alert">{error}</p>}
           <button type="button" className="btn btn-primary" onClick={resetForm}>
             Reservar otro turno
@@ -304,6 +396,28 @@ export default function BookingPage({ onAdmin }) {
         <span>✓ Confirmación rápida</span>
         <span>✓ Agenda online</span>
       </div>
+
+      {activeBookings.length > 0 && (
+        <section className="booking-card active-bookings-card">
+          <div className="active-bookings-head">
+            <div className="active-bookings-title">
+              <h2>Tus turnos activos</h2>
+              <span className="active-bookings-count">{activeBookings.length}</span>
+            </div>
+            <p>Acá podés cancelar cualquiera de tus turnos reservados.</p>
+          </div>
+          <ul className="active-bookings">
+            {activeBookings.map((booking) => (
+              <ActiveBookingRow
+                key={booking.manageToken}
+                booking={booking}
+                onCancel={handleCancelBooking}
+                cancelling={cancelling}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
 
       <BookingProgress step={step} />
 
@@ -427,6 +541,37 @@ export default function BookingPage({ onAdmin }) {
         </section>
       )}
     </main>
+  )
+}
+
+function ActiveBookingRow({ booking, onCancel, cancelling }) {
+  const d = new Date(`${booking.date}T00:00:00`)
+  const dayNum = d.getDate()
+  const monthShort = MONTH_NAMES[d.getMonth()].slice(0, 3)
+  const dayName = DAY_NAMES[d.getDay()]
+
+  return (
+    <li className="active-booking-row">
+      <span className="booking-cal-badge" aria-hidden="true">
+        <small>{monthShort}</small>
+        <strong>{dayNum}</strong>
+      </span>
+      <div className="active-booking-info">
+        <strong>{booking.service}</strong>
+        <span>
+          {dayName} · {booking.time} h
+          <i className="active-booking-dot" aria-hidden="true" /> Activo
+        </span>
+      </div>
+      <button
+        type="button"
+        className="btn btn-danger"
+        onClick={() => onCancel(booking.manageToken)}
+        disabled={cancelling}
+      >
+        {cancelling ? 'Cancelando…' : 'Cancelar'}
+      </button>
+    </li>
   )
 }
 
