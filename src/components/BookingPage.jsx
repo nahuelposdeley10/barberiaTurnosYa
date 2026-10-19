@@ -8,6 +8,7 @@ const MONTH_NAMES = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ]
+const HERO_IMG = 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=1400&auto=format&fit=crop'
 
 function localDateStr(d) {
   const y = d.getFullYear()
@@ -62,7 +63,7 @@ export default function BookingPage({ onAdmin }) {
     // The loading indicator mirrors the lifecycle of the availability request.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    getAvailability(date, selectedService)
+    getAvailability(date || today, selectedService)
       .then((data) => {
         if (disposed) return
         setBarberName(data.barberName || 'Barbería')
@@ -83,11 +84,11 @@ export default function BookingPage({ onAdmin }) {
     return () => {
       disposed = true
     }
-  }, [date, selectedService])
+  }, [date, selectedService, today])
 
   async function refreshSlots() {
     try {
-      const data = await getAvailability(date, selectedService)
+      const data = await getAvailability(date || today, selectedService)
       setSlots(data.slots || [])
       return data
     } catch (err) {
@@ -127,7 +128,7 @@ export default function BookingPage({ onAdmin }) {
 
   function resetForm() {
     setConfirm(null)
-    setDate(today)
+    setDate('')
     setSelectedSlot('')
     setStep(1)
     setName('')
@@ -220,23 +221,21 @@ export default function BookingPage({ onAdmin }) {
         </button>
       </header>
 
-      <section className="booking-intro">
-        <div className="booking-intro-copy">
-          <span className="booking-eyebrow">Agenda tu visita</span>
-          <h1 className="booking-title">Tu próximo corte empieza acá.</h1>
-          <p className="booking-lead">{message}</p>
-        </div>
-        <aside className="booking-intro-aside" aria-label="Reserva online">
+      <section className="booking-hero" aria-label="Reservá tu turno">
+        <img className="booking-hero-image" src={HERO_IMG} alt="" />
+        <div className="booking-hero-overlay" />
+        <div className="booking-hero-content">
+          <span className="booking-hero-kicker">Barbershop</span>
           <BarberPole />
-          <span className="booking-aside-label">Turnos</span>
-          <strong className="booking-aside-value">100% online</strong>
-        </aside>
+          <h1>Reservá tu turno</h1>
+          <p>{message}</p>
+        </div>
       </section>
 
-      <div className="booking-trust" aria-label="Ventajas de reservar online">
-        <span className="booking-trust-item"><b>01</b> Elegís el servicio</span>
-        <span className="booking-trust-item"><b>02</b> Ves horarios reales</span>
-        <span className="booking-trust-item"><b>03</b> Confirmás en segundos</span>
+      <div className="booking-features" aria-label="Ventajas de reservar online">
+        <span>✓ Sin esperas</span>
+        <span>✓ Confirmación rápida</span>
+        <span>✓ Agenda online</span>
       </div>
 
       <BookingProgress step={step} />
@@ -252,7 +251,7 @@ export default function BookingPage({ onAdmin }) {
                 className={`booking-service ${selectedService === service.name ? 'active' : ''}`}
                 onClick={() => {
                   setSelectedService(service.name)
-                  setDate(today)
+                  setDate('')
                   setSelectedSlot('')
                   setStep(2)
                   setError('')
@@ -308,8 +307,11 @@ export default function BookingPage({ onAdmin }) {
                   <button
                     key={slot.time}
                     type="button"
-                    className={`slot-btn ${slot.free ? 'free' : 'taken'} ${selectedSlot === slot.time ? 'active' : ''}`}
+                    className={`slot-btn ${slot.free ? (slot.ocupadas > 0 ? 'partial' : 'free') : 'taken'} ${selectedSlot === slot.time ? 'active' : ''}`}
                     disabled={!slot.free}
+                    style={slot.free && slot.ocupadas > 0 && slot.sillas
+                      ? { background: `linear-gradient(90deg, rgba(248, 113, 113, 0.24) 0 ${Math.round((slot.ocupadas / slot.sillas) * 100)}%, rgba(52, 211, 153, 0.25) ${Math.round((slot.ocupadas / slot.sillas) * 100)}% 100%)` }
+                      : undefined}
                     onClick={() => {
                       setSelectedSlot(slot.time)
                       setStep(4)
@@ -326,6 +328,7 @@ export default function BookingPage({ onAdmin }) {
               <div className="cal-legend">
                 <span className="cal-legend-item"><i className="dot free" /> Libre</span>
                 <span className="cal-legend-item"><i className="dot full" /> Ocupado</span>
+                <span className="cal-legend-item"><i className="dot partial" /> Medio ocupado</span>
               </div>
             </>
           )}
