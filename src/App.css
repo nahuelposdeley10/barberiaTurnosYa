@@ -1138,6 +1138,35 @@ input[type='time']::-webkit-datetime-edit-field {
   letter-spacing: -0.3px;
 }
 
+.booking-brand-copy .brand-skeleton {
+  width: 150px;
+  height: 19px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.14) 37%,
+    rgba(255, 255, 255, 0.06) 63%
+  );
+  background-size: 400% 100%;
+  animation: brand-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes brand-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booking-brand-copy .brand-skeleton {
+    animation: none;
+  }
+}
+
 .booking-brand-copy span {
   margin-top: 4px;
   color: var(--muted);

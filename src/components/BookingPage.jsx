@@ -75,7 +75,7 @@ export default function BookingPage({ onAdmin }) {
     return localDateStr(d)
   })()
 
-  const [barberName, setBarberName] = useState('Barbería')
+  const [barberName, setBarberName] = useState('')
   const [message, setMessage] = useState('Reservá tu turno online, sin esperas.')
   const [services, setServices] = useState([])
   const [slots, setSlots] = useState([])
@@ -99,7 +99,9 @@ export default function BookingPage({ onAdmin }) {
   const freeCount = slots.filter((slot) => slot.free).length
 
   useEffect(() => {
-    document.title = `${barberName} · Reservá tu turno online`
+    if (barberName) {
+      document.title = `${barberName} · Reservá tu turno online`
+    }
   }, [barberName])
 
   useEffect(() => {
@@ -166,7 +168,7 @@ export default function BookingPage({ onAdmin }) {
     getAvailability(date || today, selectedService)
       .then((data) => {
         if (disposed) return
-        setBarberName(data.barberName || 'Barbería')
+        setBarberName(data.barberName || '')
         setMessage(data.message || 'Reservá tu turno online, sin esperas.')
         setServices(data.services || [])
         setSlots(data.slots || [])
@@ -320,10 +322,7 @@ export default function BookingPage({ onAdmin }) {
         <header className="booking-topbar">
           <div className="booking-brand">
             <span className="booking-brand-mark">✂</span>
-            <div className="booking-brand-copy">
-              <strong>{barberName}</strong>
-              <span>Reservas online</span>
-            </div>
+            <BrandCopy name={barberName} />
           </div>
           <BarberPole />
         </header>
@@ -405,10 +404,7 @@ export default function BookingPage({ onAdmin }) {
       <header className="booking-topbar">
         <div className="booking-brand">
           <span className="booking-brand-mark">✂</span>
-          <div className="booking-brand-copy">
-            <strong>{barberName}</strong>
-            <span>Reservas online</span>
-          </div>
+          <BrandCopy name={barberName} />
         </div>
         <button type="button" className="booking-admin-link" onClick={onAdmin}>
           Ingreso barbero <span aria-hidden="true">↗</span>
@@ -673,5 +669,14 @@ function ConfirmRow({ label, value }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </li>
+  )
+}
+
+function BrandCopy({ name }) {
+  return (
+    <div className="booking-brand-copy">
+      {name ? <strong>{name}</strong> : <strong className="brand-skeleton" aria-hidden="true" />}
+      <span>Reservas online</span>
+    </div>
   )
 }
