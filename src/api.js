@@ -9,7 +9,11 @@ async function request(path, options = {}) {
     },
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || 'Error de conexión con el servidor')
+  if (!res.ok) {
+    const error = new Error(data.error || 'Error de conexión con el servidor')
+    error.status = res.status
+    throw error
+  }
   return data
 }
 
@@ -23,6 +27,10 @@ export function getMonthAvailability(from, service) {
 
 export function createBooking(payload) {
   return request('/bookings', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function getManagedBooking(token) {
+  return request(`/bookings/manage/${encodeURIComponent(token)}`)
 }
 
 export function cancelBooking(token) {

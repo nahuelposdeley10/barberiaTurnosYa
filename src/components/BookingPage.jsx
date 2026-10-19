@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { cancelBooking, createBooking, getAvailability } from '../api'
+import { cancelBooking, createBooking, getAvailability, getManagedBooking } from '../api'
 import { BarberPole, ServiceIcon } from './BarberIcons'
 import ScheduleCalendar from './ScheduleCalendar'
 
@@ -9,6 +9,7 @@ const MONTH_NAMES = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ]
 const HERO_IMG = 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=1400&auto=format&fit=crop'
+const ACTIVE_BOOKING_KEY = 'turnobarberya:active-booking'
 
 function localDateStr(d) {
   const y = d.getFullYear()
@@ -49,6 +50,7 @@ export default function BookingPage({ onAdmin }) {
   const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirm, setConfirm] = useState(null)
+  const [restoringBooking, setRestoringBooking] = useState(true)
   const [cancelling, setCancelling] = useState(false)
   const [cancelled, setCancelled] = useState(false)
 
@@ -57,6 +59,51 @@ export default function BookingPage({ onAdmin }) {
   useEffect(() => {
     document.title = `${barberName} · Reservá tu turno online`
   }, [barberName])
+
+  useEffect(() => {
+    let disposed = false
+    let stored
+    try {
+      stored = JSON.parse(window.localStorage.getItem(ACTIVE_BOOKING_KEY) || 'null')
+    } catch {
+      window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
+    }
+
+    if (!stored?.manageToken) {
+      // The restore check synchronizes the initial localStorage read with the loading state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRestoringBooking(false)
+      return () => {
+        disposed = true
+      }
+    }
+
+    getManagedBooking(stored.manageToken)
+      .then((booking) => {
+        if (disposed) return
+        if (booking.status === 'done' || booking.status === 'cancelled') {
+          window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
+          return
+        }
+        setConfirm({ ...booking, manageToken: stored.manageToken })
+        setCancelled(false)
+      })
+      .catch((err) => {
+        if (disposed) return
+        if (err.status === 404) {
+          window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
+        } else {
+          setError('No pudimos revisar tu turno guardado. Volvé a intentar en unos segundos.')
+        }
+      })
+      .finally(() => {
+        if (!disposed) setRestoringBooking(false)
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [])
 
   useEffect(() => {
     let disposed = false
@@ -114,6 +161,12 @@ export default function BookingPage({ onAdmin }) {
         time: selectedSlot,
       })
       setConfirm(booking)
+      if (booking.manageToken) {
+        window.localStorage.setItem(
+          ACTIVE_BOOKING_KEY,
+          JSON.stringify({ manageToken: booking.manageToken })
+        )
+      }
       await refreshSlots()
     } catch (err) {
       setError(err.message)
@@ -127,6 +180,7 @@ export default function BookingPage({ onAdmin }) {
   }
 
   function resetForm() {
+    window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
     setConfirm(null)
     setDate('')
     setSelectedSlot('')
@@ -145,6 +199,7 @@ export default function BookingPage({ onAdmin }) {
     setError('')
     try {
       await cancelBooking(confirm.manageToken)
+      window.localStorage.removeItem(ACTIVE_BOOKING_KEY)
       setCancelled(true)
       setConfirm({ ...confirm, status: 'cancelled' })
     } catch (err) {
@@ -152,6 +207,18 @@ export default function BookingPage({ onAdmin }) {
     } finally {
       setCancelling(false)
     }
+  }
+
+  if (restoringBooking) {
+    return (
+      <main className="booking-page booking-result-page">
+        <section className="booking-result">
+          <p className="booking-eyebrow">Turno</p>
+          <h1>Revisando tu turno activo…</h1>
+          <p className="booking-result-lead">Estamos comprobando si todavía está vigente.</p>
+        </section>
+      </main>
+    )
   }
 
   if (confirm) {
@@ -172,8 +239,8 @@ export default function BookingPage({ onAdmin }) {
           <div className={`result-icon ${cancelled ? 'result-icon-cancelled' : ''}`}>
             {cancelled ? '×' : '✓'}
           </div>
-          <p className="booking-eyebrow">{cancelled ? 'Turno cancelado' : 'Listo, ya está'}</p>
-          <h1>{cancelled ? 'Liberamos tu horario' : '¡Solicitud recibida!'}</h1>
+          <p className="booking-eyebrow">{cancelled ? 'Turno cancelado' : 'Turno activo'}</p>
+          <h1>{cancelled ? 'Liberamos tu horario' : '¡Tu turno está reservado!'}</h1>
           <p className="booking-result-lead">
             {cancelled
               ? 'El horario quedó disponible nuevamente.'

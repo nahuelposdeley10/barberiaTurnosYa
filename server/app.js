@@ -132,6 +132,15 @@ function createManageToken() {
   return { token, hash }
 }
 
+function publicBooking(booking) {
+  const result = booking.toObject()
+  delete result.manageTokenHash
+  return {
+    ...result,
+    address: 'Te esperamos en el local',
+  }
+}
+
 function slotsBetween(open, close, step) {
   const slots = []
   const start = toMinutes(open)
@@ -345,13 +354,26 @@ app.post('/api/bookings', async (req, res) => {
     } finally {
       await session.endSession()
     }
-    const publicBooking = booking.toObject()
-    delete publicBooking.manageTokenHash
     res.status(201).json({
-      ...publicBooking,
+      ...publicBooking(booking),
       manageToken: manageToken.token,
-      address: 'Te esperamos en el local',
     })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error del servidor' })
+  }
+})
+
+app.get('/api/bookings/manage/:token', async (req, res) => {
+  try {
+    const token = typeof req.params.token === 'string' ? req.params.token : ''
+    if (!/^[a-f0-9]{48}$/i.test(token)) {
+      return res.status(404).json({ error: 'Turno no encontrado' })
+    }
+    const hash = crypto.createHash('sha256').update(token).digest('hex')
+    const booking = await Booking.findOne({ manageTokenHash: hash })
+    if (!booking) return res.status(404).json({ error: 'Turno no encontrado' })
+    res.json(publicBooking(booking))
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error del servidor' })
@@ -368,18 +390,14 @@ app.delete('/api/bookings/manage/:token', async (req, res) => {
     const booking = await Booking.findOne({ manageTokenHash: hash })
     if (!booking) return res.status(404).json({ error: 'Turno no encontrado' })
     if (booking.status === 'cancelled') {
-      const publicBooking = booking.toObject()
-      delete publicBooking.manageTokenHash
-      return res.json(publicBooking)
+      return res.json(publicBooking(booking))
     }
     if (booking.status === 'done') {
       return res.status(409).json({ error: 'No se puede cancelar un turno completado' })
     }
     booking.status = 'cancelled'
     await booking.save()
-    const publicBooking = booking.toObject()
-    delete publicBooking.manageTokenHash
-    res.json(publicBooking)
+    res.json(publicBooking(booking))
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error del servidor' })
