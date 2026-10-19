@@ -16,7 +16,6 @@ const MONTH_NAMES = [
 ]
 
 const STATUS_LABELS = {
-  pending: 'Pendiente',
   confirmed: 'Confirmado',
   cancelled: 'Cancelado',
   done: 'Completado',
@@ -160,7 +159,6 @@ export default function AdminPage({ token, onLogout }) {
   }
 
   const stats = {
-    pending: bookings.filter((b) => b.status === 'pending').length,
     confirmed: bookings.filter((b) => b.status === 'confirmed').length,
     done: bookings.filter((b) => b.status === 'done').length,
     cancelled: bookings.filter((b) => b.status === 'cancelled').length,
@@ -219,7 +217,6 @@ export default function AdminPage({ token, onLogout }) {
                 onChange={(e) => setStatus(e.target.value)}
               >
                 <option value="">Todos</option>
-                <option value="pending">Pendientes</option>
                 <option value="confirmed">Confirmados</option>
                 <option value="done">Completados</option>
                 <option value="cancelled">Cancelados</option>
@@ -229,7 +226,6 @@ export default function AdminPage({ token, onLogout }) {
 
           {status === '' && (
             <div className="stats">
-              <span className="stat stat-pending">{stats.pending} pendientes</span>
               <span className="stat stat-confirmed">{stats.confirmed} confirmados</span>
               <span className="stat stat-done">{stats.done} completados</span>
               <span className="stat stat-cancelled">{stats.cancelled} cancelados</span>
@@ -266,26 +262,13 @@ export default function AdminPage({ token, onLogout }) {
                     </div>
                     <div className="booking-actions">
                       {b.status !== 'cancelled' && b.status !== 'done' && (
-                        <>
-                          {b.status !== 'confirmed' && (
-                            <button
-                              type="button"
-                              className="btn btn-small btn-confirm"
-                              onClick={() => changeStatus(b._id, 'confirmed')}
-                            >
-                              Confirmar
-                            </button>
-                          )}
-                          {b.status !== 'done' && (
-                            <button
-                              type="button"
-                              className="btn btn-small btn-done"
-                              onClick={() => changeStatus(b._id, 'done')}
-                            >
-                              Completado
-                            </button>
-                          )}
-                        </>
+                        <button
+                          type="button"
+                          className="btn btn-small btn-done"
+                          onClick={() => changeStatus(b._id, 'done')}
+                        >
+                          Completado
+                        </button>
                       )}
                       {b.status !== 'cancelled' && b.status !== 'done' && (
                         <button

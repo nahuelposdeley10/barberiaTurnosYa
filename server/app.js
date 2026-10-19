@@ -17,7 +17,16 @@ const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '1234'
 let dbConnection
 export function connectDB() {
   if (!dbConnection) {
-    dbConnection = mongoose.connect(process.env.MONGODB_URI)
+    dbConnection = mongoose.connect(process.env.MONGODB_URI).then(async (conn) => {
+      // Migración: los turnos ahora nacen confirmados, así que los "pending"
+      // legados pasan a "confirmed" para que no queden estados huérfanos.
+      try {
+        await Booking.updateMany({ status: 'pending' }, { $set: { status: 'confirmed' } })
+      } catch (err) {
+        console.error('No se pudieron migrar los turnos pendientes:', err.message)
+      }
+      return conn
+    })
   }
   return dbConnection
 }
@@ -341,7 +350,7 @@ app.post('/api/bookings', async (req, res) => {
           price: serviceCfg.price,
           date: d,
           time,
-          status: 'pending',
+          status: 'confirmed',
           manageTokenHash: manageToken.hash,
         }], { session })
         booking = created[0]
@@ -428,7 +437,7 @@ app.get('/api/admin/bookings', auth, async (req, res) => {
       if (!d) return res.status(400).json({ error: 'Fecha inválida' })
       filter.date = d
     }
-    if (status && ['pending', 'confirmed', 'cancelled', 'done'].includes(status)) {
+    if (status && ['confirmed', 'cancelled', 'done'].includes(status)) {
       filter.status = status
     }
     const bookings = await Booking.find(filter).select('-manageTokenHash').sort({ date: 1, time: 1 })
@@ -445,7 +454,7 @@ app.patch('/api/admin/bookings/:id', auth, async (req, res) => {
       return res.status(400).json({ error: 'ID inválido' })
     }
     const { status } = req.body || {}
-    if (!['pending', 'confirmed', 'cancelled', 'done'].includes(status)) {
+    if (!['confirmed', 'cancelled', 'done'].includes(status)) {
       return res.status(400).json({ error: 'Estado inválido' })
     }
     const booking = await Booking.findByIdAndUpdate(req.params.id, { status }, { new: true })

@@ -12,8 +12,8 @@ const bookingSchema = new mongoose.Schema(
     manageTokenHash: { type: String, default: '', index: true },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'done'],
-      default: 'pending',
+      enum: ['confirmed', 'cancelled', 'done'],
+      default: 'confirmed',
     },
   },
   { timestamps: true }

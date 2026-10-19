@@ -12,7 +12,6 @@ const HERO_IMG = 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q
 const ACTIVE_BOOKING_KEY = 'turnobarberya:active-booking'
 const CLOSE_COUNTDOWN = 3
 const STATUS_LABELS = {
-  pending: 'Pendiente',
   confirmed: 'Confirmado',
   cancelled: 'Cancelado',
   done: 'Completado',
